@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Morpion en ligne — 2 joueurs (P2P)</title>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    /* ── CHARTE GRAPHIQUE (identique au Jeu des paires) ── */
+    --brand-light:  #C2F6FF;
+    --brand-dark:   #38B6FF;
+
+    --config-bg:    #38B6FF;
+    --config-border:#1e9fe8;
+    --config-text:  #063a52;
+    --config-muted: #0a5b80;
+    --input-bg:     #ffffff;
+    --input-border: #7dd3f0;
+    --game-bg:      #C2F6FF;
+    --side-bg:      #38B6FF;
+    --side-border:  #1e9fe8;
+    --stats-bg:     #38B6FF;
+    --stats-border: #1e9fe8;
+    --accent:       #0284c7;
+    --accent-light: #e0f6ff;
+    --accent-dark:  #075985;
+    --green:        #10b981;
+    --green-light:  #d1fae5;
+    --green-dark:   #065f46;
+    --red:          #ef4444;
+    --red-light:    #fee2e2;
+    --yellow:       #f59e0b;
+    --yellow-light: #fef3c7;
+    --purple:       #8b5cf6;
+    --cell-bg:      #ffffff;
+    --p1:           #0369a1;
+    --p2:           #b91c1c;
+    --text:         #06283d;
+    --text-muted:   #0a5b80;
+    --radius:       12px;
+    --radius-sm:    8px;
+    --t:            0.18s ease;
+  }
+
+  html, body { width:100%; height:100%; overflow:hidden; background:var(--game-bg); color:var(--text); font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif; user-select:none; }
+  #app { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+
+  /* ── CONFIG ── */
+  #configpanel {
+    background:var(--config-bg); border-bottom:1px solid var(--config-border);
+    padding:10px 16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; flex-shrink:0;
+    box-shadow:0 1px 4px #00000010;
+  }
+  .game-title { font-size:1.2rem; font-weight:900; color:#fff; letter-spacing:2px; text-transform:uppercase; white-space:nowrap; font-family:'Courier New',Courier,monospace; margin-right:4px; }
+  .separator  { width:1px; height:28px; background:#8adcff; flex-shrink:0; }
+  .cfg-group  { display:flex; align-items:center; gap:6px; }
+  .cfg-label  { font-size:.72rem; font-weight:800; color:#eaffff; text-transform:uppercase; letter-spacing:.8px; white-space:nowrap; }
+
+  select, input[type=text] {
+    height:34px; background:var(--input-bg); border:1px solid var(--input-border); border-radius:var(--radius-sm);
+    color:var(--config-text); font-size:.85rem; font-family:inherit; font-weight:700; cursor:pointer;
+    outline:none; transition:border-color var(--t),box-shadow var(--t);
+    appearance:none; -webkit-appearance:none; background-color:var(--input-bg);
+    padding:0 8px; box-shadow:0 1px 3px #0000000a;
+  }
+  select {
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 8px center; padding:0 26px 0 8px;
+  }
+  input[type=text] { cursor:text; width:130px; }
+  select:hover, input[type=text]:hover { border-color:var(--accent); }
+  select:focus, input[type=text]:focus { border-color:var(--accent); box-shadow:0 0 0 3px #3b82f630; }
+  select:disabled, input:disabled { opacity:.5; cursor:not-allowed; }
+  select.dim-select { width:78px; }
+  select#sel-symbols { min-width:150px; }
+
+  .btn {
+    display:inline-flex; align-items:center; gap:6px; height:34px; padding:0 14px;
+    border-radius:var(--radius-sm); border:1px solid var(--input-border);
+    background:var(--input-bg); color:var(--config-text);
+    font-size:.82rem; font-family:inherit; font-weight:700;
+    cursor:pointer; transition:all var(--t); white-space:nowrap; box-shadow:0 1px 3px #0000000a;
+  }
+  .btn:hover { border-color:var(--accent); background:var(--accent-light); color:var(--accent-dark); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .btn:disabled:hover { border-color:var(--input-border); background:var(--input-bg); color:var(--config-text); }
+  .btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); font-size:.88rem; padding:0 18px; box-shadow:0 2px 8px #3b82f640; }
+  .btn.primary:hover { background:var(--accent-dark); }
+  .btn.danger { background:var(--red-light); border-color:#fca5a5; color:#b91c1c; }
+  .btn.danger:hover { background:#fecaca; border-color:var(--red); }
+  .btn.btn-net  { background:#eff6ff; border-color:#93c5fd; color:#1d4ed8; }
+  .btn.btn-net:hover  { background:#dbeafe; border-color:#3b82f6; }
+  .btn.btn-aide-toggle { background:#fefce8; border-color:#fde68a; color:#92400e; }
+  .btn.btn-aide-toggle:hover { background:#fef9c3; border-color:#f59e0b; }
+  #btn-quit { margin-left:auto; }
+
+  /* ── BANDEAU RÉSEAU ── */
+  #netbar { display:flex; align-items:center; gap:12px; padding:6px 16px; background:#eaf9ff; border-bottom:1px solid var(--config-border); flex-shrink:0; font-size:.78rem; font-weight:700; color:var(--config-text); flex-wrap:wrap; }
+  .dot { width:10px; height:10px; border-radius:50%; background:#94a3b8; flex-shrink:0; box-shadow:0 0 0 3px #94a3b830; }
+  .dot.on   { background:var(--green); box-shadow:0 0 0 3px #10b98130; animation:blink 2s ease-in-out infinite; }
+  .dot.wait { background:var(--yellow); box-shadow:0 0 0 3px #f59e0b30; animation:blink 1s ease-in-out infinite; }
+  .dot.off  { background:var(--red); box-shadow:0 0 0 3px #ef444430; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.45} }
+  .code-pill { font-family:'Courier New',Courier,monospace; font-size:1rem; font-weight:900; letter-spacing:3px; background:#fff; border:1px solid var(--input-border); border-radius:var(--radius-sm); padding:3px 12px; color:var(--accent-dark); user-select:text; }
+  #net-ping { margin-left:auto; font-family:'Courier New',Courier,monospace; color:var(--text-muted); }
+
+  /* ── VALIDATION ── */
+  #val-msg { font-size:.75rem; color:#b91c1c; padding:4px 16px; font-weight:700; background:var(--red-light); border-bottom:1px solid #fca5a5; display:none; }
+  #val-msg.visible { display:block; }
+  #val-msg.info { color:#1e40af; background:#dbeafe; border-bottom-color:#93c5fd; }
+
+  /* ── STATS BAR ── */
+  #statsbar { display:flex; align-items:stretch; background:var(--stats-bg); border-bottom:1px solid var(--stats-border); flex-shrink:0; }
+  .stat-block { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:4px 16px; flex:1; border-right:1px solid var(--stats-border); transition:background var(--t); cursor:default; }
+  .stat-block:last-child { border-right:none; }
+  .stat-block:hover { background:#1e9fe8; }
+  .stat-label { font-size:.6rem; font-weight:800; text-transform:uppercase; letter-spacing:1.2px; color:#dff7ff; }
+  .stat-value { font-family:'Courier New',Courier,monospace; font-size:1rem; font-weight:700; color:#fff; line-height:1.1; }
+  .stat-value.c-green  { color:#7dffcf; }
+  .stat-value.c-yellow { color:#ffe27a; }
+  .stat-value.c-purple { color:#e5c9ff; }
+
+  /* ── MAIN ── */
+  #main { display:flex; flex:1 1 auto; overflow:hidden; min-height:0; }
+
+  /* ── PANNEAU LATÉRAL ── */
+  #sidepanel { width:225px; min-width:200px; background:var(--side-bg); border-right:1px solid var(--side-border); display:flex; flex-direction:column; padding:14px 12px; overflow-y:auto; flex-shrink:0; gap:16px; box-shadow:2px 0 8px #00000008; }
+  .side-section-title { font-size:.63rem; font-weight:900; color:#fff; text-transform:uppercase; letter-spacing:1.5px; padding-bottom:6px; border-bottom:2px solid #1e9fe8; }
+
+  .player-card { display:flex; align-items:center; gap:10px; background:#fff; border:2px solid #fff; border-radius:var(--radius-sm); padding:8px 10px; margin-top:8px; transition:all var(--t); }
+  .player-card.active { border-color:var(--yellow); box-shadow:0 0 0 3px #fde68a80; transform:translateX(2px); }
+  .player-card .pc-mark { font-size:1.5rem; line-height:1; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:var(--radius-sm); background:var(--accent-light); }
+  .player-card.p2 .pc-mark { background:var(--red-light); }
+  .player-card .pc-body { display:flex; flex-direction:column; min-width:0; flex:1; }
+  .player-card .pc-name { font-size:.8rem; font-weight:800; color:var(--config-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .player-card .pc-sub  { font-size:.62rem; font-weight:800; text-transform:uppercase; letter-spacing:.6px; color:var(--text-muted); }
+  .player-card .pc-score { font-family:'Courier New',Courier,monospace; font-size:1.15rem; font-weight:700; color:var(--accent-dark); }
+  .player-card.p2 .pc-score { color:var(--p2); }
+
+  .side-counter { display:flex; align-items:center; justify-content:space-between; background:#f3e8ff; border:1px solid #c4b5fd; border-radius:var(--radius-sm); padding:6px 10px; margin-top:8px; }
+  .side-counter .sc-label { font-size:.74rem; color:#6d28d9; font-weight:700; }
+  .side-counter .sc-val   { font-family:'Courier New',Courier,monospace; color:#6d28d9; font-weight:700; font-size:.9rem; }
+
+  #chat-box { display:flex; flex-direction:column; gap:5px; margin-top:8px; max-height:150px; overflow-y:auto; }
+  .chat-msg { background:#fff; border-radius:8px; padding:4px 8px; font-size:.74rem; color:var(--config-text); line-height:1.35; word-break:break-word; user-select:text; }
+  .chat-msg b { color:var(--accent-dark); }
+  .chat-msg.mine b { color:var(--p2); }
+  .chat-msg.sys { background:#dbeafe; color:#1e40af; font-weight:700; }
+  #chat-form { display:flex; gap:5px; margin-top:6px; }
+  #chat-input { flex:1; min-width:0; width:auto; height:30px; font-weight:600; font-size:.78rem; }
+  #chat-send { height:30px; padding:0 10px; }
+  #chat-quick { display:flex; gap:4px; margin-top:5px; flex-wrap:wrap; }
+  #chat-quick button { background:#fff; border:1px solid var(--input-border); border-radius:6px; font-size:.95rem; padding:2px 6px; cursor:pointer; }
+  #chat-quick button:hover { background:var(--accent-light); border-color:var(--accent); }
+
+  #history-list { display:flex; flex-direction:column; gap:4px; margin-top:8px; max-height:140px; overflow-y:auto; }
+  .hist-item { display:flex; align-items:center; gap:6px; background:#fff; border-radius:6px; padding:3px 8px; font-size:.74rem; font-weight:700; color:var(--config-text); }
+  .hist-item .hi-num { font-family:'Courier New',Courier,monospace; color:var(--text-muted); min-width:20px; }
+  .hist-item .hi-pos { font-family:'Courier New',Courier,monospace; margin-left:auto; color:var(--accent-dark); }
+
+  /* ── ZONE DE JEU ── */
+  #grid-area { flex:1; display:flex; align-items:center; justify-content:center; padding:16px; overflow:hidden; min-width:0; background:var(--game-bg); position:relative; }
+  #board { display:flex; flex-direction:column; gap:6px; align-items:center; }
+  .board-row { display:flex; gap:6px; }
+
+  .cell {
+    background:var(--cell-bg); border:2px solid var(--input-border); border-radius:var(--radius);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; line-height:1;
+    transition:border-color var(--t),box-shadow var(--t),background var(--t);
+    box-shadow:0 2px 8px #0284c718;
+  }
+  .cell.playable:hover { border-color:var(--accent); box-shadow:0 4px 16px #3b82f640,0 0 0 3px #3b82f620; }
+  .cell:not(.playable) { cursor:default; }
+  .cell .mark  { animation:popIn .26s cubic-bezier(.34,1.56,.64,1); }
+  .cell .ghost { opacity:.16; }
+  .cell.p1 { color:var(--p1); }
+  .cell.p2 { color:var(--p2); }
+  .cell.last { box-shadow:0 0 0 3px #f59e0b70; }
+  .cell.win  { background:var(--green-light); border-color:var(--green); animation:winPulse .55s ease 2; }
+  @keyframes popIn { from{transform:scale(0) rotate(-12deg);opacity:0} to{transform:scale(1) rotate(0);opacity:1} }
+  @keyframes winPulse { 0%,100%{box-shadow:0 2px 8px #10b98140} 50%{box-shadow:0 0 0 6px #10b98150} }
+
+  #placeholder { text-align:center; color:var(--accent-dark); font-weight:800; font-size:1rem; opacity:.8; max-width:460px; line-height:1.6; }
+  #placeholder .ph-big { font-size:3rem; display:block; margin-bottom:10px; }
+
+  /* ── OVERLAYS / MODALES ── */
+  .modal { display:none; position:fixed; inset:0; background:#00000070; backdrop-filter:blur(8px); z-index:150; align-items:center; justify-content:center; }
+  .modal.show { display:flex; }
+  .modal-card { background:#fff; border:1px solid var(--side-border); border-radius:20px; padding:30px 36px; display:flex; flex-direction:column; gap:16px; box-shadow:0 30px 80px #00000030; animation:slideUp .35s cubic-bezier(.34,1.56,.64,1); width:520px; max-width:92vw; max-height:92vh; overflow-y:auto; }
+  @keyframes slideUp { from{transform:translateY(30px) scale(.95);opacity:0} to{transform:translateY(0) scale(1);opacity:1} }
+  .modal-card h2 { font-size:1.35rem; font-weight:900; color:var(--accent-dark); }
+  .modal-card p  { font-size:.85rem; color:var(--text-muted); line-height:1.5; }
+  .modal-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .modal-close { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; width:32px; height:32px; cursor:pointer; font-size:1rem; font-weight:700; color:#64748b; }
+
+  .choice-grid { display:flex; flex-direction:column; gap:10px; }
+  .choice {
+    display:flex; align-items:center; gap:14px; text-align:left; cursor:pointer;
+    background:var(--accent-light); border:2px solid var(--input-border); border-radius:var(--radius);
+    padding:14px 16px; transition:all var(--t); font-family:inherit;
+  }
+  .choice:hover:not(:disabled) { border-color:var(--accent); background:#d5f1ff; transform:translateY(-1px); }
+  .choice:disabled { opacity:.5; cursor:not-allowed; }
+  .choice .ch-ico  { font-size:1.8rem; }
+  .choice .ch-tit  { font-size:.95rem; font-weight:900; color:var(--accent-dark); }
+  .choice .ch-sub  { font-size:.76rem; color:var(--text-muted); font-weight:600; }
+
+  .field-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .field-row label { font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.8px; color:var(--text-muted); min-width:92px; }
+  .code-input { font-family:'Courier New',Courier,monospace; font-size:1.4rem !important; letter-spacing:6px; text-align:center; text-transform:uppercase; height:48px !important; width:190px !important; font-weight:900 !important; }
+  .big-code { font-family:'Courier New',Courier,monospace; font-size:2.4rem; font-weight:900; letter-spacing:10px; color:var(--accent-dark); background:var(--accent-light); border:2px dashed var(--accent); border-radius:var(--radius); padding:14px; text-align:center; user-select:text; }
+  .share-link { display:flex; gap:6px; }
+  .share-link input { flex:1; min-width:0; width:auto !important; font-size:.75rem !important; font-weight:600 !important; }
+  .note { background:#fef3c7; border:1px solid #fde68a; border-radius:var(--radius-sm); padding:10px 12px; font-size:.78rem; color:#92400e; line-height:1.5; }
+  .note.blue { background:#dbeafe; border-color:#93c5fd; color:#1e40af; }
+
+  .overlay-stats { display:flex; gap:24px; background:var(--stats-bg); border-radius:var(--radius); padding:14px 20px; width:100%; justify-content:center; }
+  .ov-stat { display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .ov-stat-val { font-family:'Courier New',Courier,monospace; font-size:1.4rem; font-weight:700; color:#fff; }
+  .ov-stat-lbl { font-size:.65rem; font-weight:800; text-transform:uppercase; letter-spacing:1px; color:#dff7ff; }
+  .overlay-buttons { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+  #ov-card { align-items:center; text-align:center; }
+  #ov-title { font-size:1.7rem; font-weight:900; color:var(--green-dark); }
+  #ov-title.draw { color:var(--accent-dark); }
+  #ov-wait { font-size:.82rem; font-weight:700; color:var(--text-muted); display:none; }
+
+  ol.help { margin:0; padding-left:20px; display:flex; flex-direction:column; gap:9px; font-size:.85rem; color:#1e293b; line-height:1.5; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- CONFIG -->
+  <div id="configpanel">
+    <span class="game-title">❌ Morpion</span>
+    <div class="separator"></div>
+
+    <div class="cfg-group">
+      <span class="cfg-label">Grille</span>
+      <select id="sel-size" class="dim-select">
+        <option value="3" selected>3 × 3</option><option value="4">4 × 4</option>
+        <option value="5">5 × 5</option><option value="6">6 × 6</option>
+        <option value="7">7 × 7</option><option value="8">8 × 8</option>
+        <option value="9">9 × 9</option><option value="10">10 × 10</option>
+      </select>
+    </div>
+    <div class="cfg-group">
+      <span class="cfg-label">Alignement</span>
+      <select id="sel-align" class="dim-select">
+        <option value="3" selected>3</option><option value="4">4</option><option value="5">5</option>
+      </select>
+    </div>
+    <div class="separator"></div>
+    <div class="cfg-group">
+      <span class="cfg-label">Symboles</span>
+      <select id="sel-symbols">
+        <option value="classic" selected>Classique ✕ ◯</option>
+        <option value="hearts">Cœurs ❤️ 💙</option>
+        <option value="animals">Animaux 🐶 🐱</option>
+        <option value="food">Alimentation 🍎 🍌</option>
+        <option value="shapes">Formes 🔷 🔶</option>
+      </select>
+    </div>
+    <div class="separator"></div>
+    <div class="cfg-group">
+      <span class="cfg-label">Mon pseudo</span>
+      <input type="text" id="inp-me" maxlength="14" value="Joueur 1">
+    </div>
+    <div class="separator"></div>
+    <button class="btn primary" id="btn-start">▶ Lancer la manche</button>
+    <button class="btn btn-net" id="btn-connect">🌐 Connexion</button>
+    <button class="btn btn-aide-toggle" id="btn-aide-toggle">❓ Aide</button>
+    <button class="btn danger" id="btn-quit">✕ Quitter</button>
+  </div>
+
+  <!-- BANDEAU RÉSEAU -->
+  <div id="netbar">
+    <span class="dot" id="net-dot"></span>
+    <span id="net-text">Mode local — les deux joueurs jouent sur cet écran</span>
+    <span id="net-code-wrap" style="display:none;">Code&nbsp;: <span class="code-pill" id="net-code">-----</span></span>
+    <button class="btn" id="btn-copy-link" style="display:none;height:26px;padding:0 10px;font-size:.74rem;">🔗 Copier le lien d'invitation</button>
+    <span id="net-ping"></span>
+  </div>
+
+  <!-- VALIDATION -->
+  <div id="val-msg"></div>
+
+  <!-- STATS BAR -->
+  <div id="statsbar">
+    <div class="stat-block"><span class="stat-label">Temps</span><span class="stat-value" id="st-time">00:00</span></div>
+    <div class="stat-block"><span class="stat-label">Au tour de</span><span class="stat-value c-yellow" id="st-turn">—</span></div>
+    <div class="stat-block"><span class="stat-label">Coups joués</span><span class="stat-value" id="st-moves">0</span></div>
+    <div class="stat-block"><span class="stat-label">Score (manches)</span><span class="stat-value c-green" id="st-score">0 — 0</span></div>
+    <div class="stat-block"><span class="stat-label">Objectif</span><span class="stat-value c-purple" id="st-goal">3 alignés</span></div>
+  </div>
+
+  <!-- MAIN -->
+  <div id="main">
+
+    <div id="sidepanel">
+      <div>
+        <div class="side-section-title">Joueurs</div>
+        <div class="player-card p1" id="pc-1">
+          <span class="pc-mark" id="pc-mark-1">✕</span>
+          <span class="pc-body">
+            <span class="pc-name" id="pc-name-1">Joueur 1</span>
+            <span class="pc-sub"  id="pc-sub-1">Hôte</span>
+          </span>
+          <span class="pc-score" id="pc-score-1">0</span>
+        </div>
+        <div class="player-card p2" id="pc-2">
+          <span class="pc-mark" id="pc-mark-2">◯</span>
+          <span class="pc-body">
+            <span class="pc-name" id="pc-name-2">Joueur 2</span>
+            <span class="pc-sub"  id="pc-sub-2">Invité</span>
+          </span>
+          <span class="pc-score" id="pc-score-2">0</span>
+        </div>
+        <div class="side-counter"><span class="sc-label">Matchs nuls</span><span class="sc-val" id="sc-draws">0</span></div>
+        <div class="side-counter"><span class="sc-label">Manches jouées</span><span class="sc-val" id="sc-rounds">0</span></div>
+      </div>
+
+      <div>
+        <div class="side-section-title">Discussion</div>
+        <div id="chat-box"></div>
+        <div id="chat-quick">
+          <button data-msg="Bien joué !">👏</button>
+          <button data-msg="Aïe…">😅</button>
+          <button data-msg="À toi !">👉</button>
+          <button data-msg="On refait une manche ?">🔁</button>
+          <button data-msg="Salut !">👋</button>
+        </div>
+        <div id="chat-form">
+          <input type="text" id="chat-input" maxlength="120" placeholder="Message…">
+          <button class="btn" id="chat-send">➤</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="side-section-title">Historique des coups</div>
+        <div id="history-list"></div>
+      </div>
+    </div>
+
+    <div id="grid-area">
+      <div id="placeholder">
+        <span class="ph-big">❌⭕</span>
+        Cliquez sur <strong>🌐 Connexion</strong> pour créer ou rejoindre une partie en ligne,<br>
+        ou lancez directement une partie <strong>locale</strong> à deux sur cet écran.
+      </div>
+      <div id="board" style="display:none"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODALE CONNEXION -->
+<div class="modal" id="net-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>🌐 Connexion des joueurs</h2>
+      <button class="modal-close" id="net-modal-close">✕</button>
+    </div>
+
+    <!-- Étape choix -->
+    <div id="net-step-choice">
+      <div class="field-row" style="margin-bottom:14px;">
+        <label for="inp-nick">Mon pseudo</label>
+        <input type="text" id="inp-nick" maxlength="14" value="Joueur 1" style="width:200px">
+      </div>
+      <div class="choice-grid">
+        <button class="choice" id="ch-host">
+          <span class="ch-ico">🎬</span>
+          <span><span class="ch-tit">Créer une partie</span><br><span class="ch-sub">Vous obtenez un code à partager avec votre adversaire. Vous jouez les ✕ et pilotez les réglages.</span></span>
+        </button>
+        <button class="choice" id="ch-join">
+          <span class="ch-ico">🔑</span>
+          <span><span class="ch-tit">Rejoindre une partie</span><br><span class="ch-sub">Saisissez le code reçu. Vous jouez les ◯.</span></span>
+        </button>
+        <button class="choice" id="ch-local">
+          <span class="ch-ico">🪑</span>
+          <span><span class="ch-tit">Jouer en local</span><br><span class="ch-sub">Les deux joueurs se partagent le même écran, sans connexion.</span></span>
+        </button>
+      </div>
+      <p style="margin-top:12px;">La connexion est <strong>directe entre les deux navigateurs</strong> (WebRTC / PeerJS) : aucune donnée de partie ne transite par un serveur, seul l'annuaire public PeerJS sert à la mise en relation.</p>
+    </div>
+
+    <!-- Étape hôte -->
+    <div id="net-step-host" style="display:none;">
+      <p>Transmettez ce code (ou le lien) à votre adversaire :</p>
+      <div class="big-code" id="host-code">·····</div>
+      <div class="share-link">
+        <input type="text" id="host-link" readonly>
+        <button class="btn btn-net" id="btn-copy-link2">🔗 Copier</button>
+      </div>
+      <div class="note blue" id="host-status">⏳ En attente de connexion de l'adversaire…</div>
+      <div class="overlay-buttons">
+        <button class="btn" id="host-back">↩ Retour</button>
+      </div>
+    </div>
+
+    <!-- Étape invité -->
+    <div id="net-step-join" style="display:none;">
+      <p>Saisissez le code communiqué par l'hôte :</p>
+      <div style="display:flex;justify-content:center;">
+        <input type="text" id="join-code" class="code-input" maxlength="5" placeholder="ABCDE">
+      </div>
+      <div class="note blue" id="join-status" style="display:none;"></div>
+      <div class="overlay-buttons">
+        <button class="btn primary" id="btn-do-join">🔌 Se connecter</button>
+        <button class="btn" id="join-back">↩ Retour</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODALE AIDE -->
+<div class="modal" id="aide-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>🎮 Comment jouer</h2>
+      <button class="modal-close" id="btn-aide-close">✕</button>
+    </div>
+    <ol class="help">
+      <li><strong>En ligne :</strong> l'un des joueurs choisit <strong>Créer une partie</strong> et envoie le code (5 caractères) ou le lien à l'autre, qui choisit <strong>Rejoindre une partie</strong>. La connexion est directe de navigateur à navigateur.</li>
+      <li>L'<strong>hôte</strong> joue le premier symbole, règle la taille de grille, l'alignement et les symboles, et lance les manches. L'<strong>invité</strong> reçoit automatiquement les réglages.</li>
+      <li>Chacun ne peut jouer que <strong>pendant son tour</strong> ; la barre de statistiques indique en permanence à qui c'est.</li>
+      <li>Le premier à aligner le nombre requis de symboles en <strong>ligne, colonne ou diagonale</strong> gagne la manche ; l'alignement est surligné en vert.</li>
+      <li>Grille pleine sans alignement : <strong>match nul</strong>.</li>
+      <li>À la fin d'une manche, l'hôte lance la suivante ; le joueur qui commence <strong>alterne</strong> et le score cumulé est conservé.</li>
+      <li>La <strong>discussion</strong> du panneau latéral permet d'échanger des messages et des réactions rapides pendant la partie.</li>
+      <li><strong>Mode local :</strong> les deux joueurs partagent le même écran, sans aucune connexion réseau.</li>
+    </ol>
+    <div class="note">🌐 Pour utiliser le mode en ligne, le fichier doit être servi en <strong>HTTPS</strong> (GitHub Pages, Netlify, Vercel…) — WebRTC est bloqué sur un simple fichier local <em>file://</em> dans certains navigateurs.</div>
+    <button class="btn primary" id="btn-aide-ok" style="align-self:center;">OK</button>
+  </div>
+</div>
+
+<!-- OVERLAY FIN DE MANCHE -->
+<div class="modal" id="overlay">
+  <div class="modal-card" id="ov-card">
+    <h2 id="ov-title">🎉 Victoire !</h2>
+    <div class="overlay-stats">
+      <div class="ov-stat"><span class="ov-stat-val" id="ov-time">—</span><span class="ov-stat-lbl">Temps</span></div>
+      <div class="ov-stat"><span class="ov-stat-val" id="ov-moves">—</span><span class="ov-stat-lbl">Coups</span></div>
+      <div class="ov-stat"><span class="ov-stat-val" id="ov-score">—</span><span class="ov-stat-lbl">Score</span></div>
+    </div>
+    <span id="ov-wait">⏳ En attente de l'hôte pour la manche suivante…</span>
+    <div class="overlay-buttons">
+      <button class="btn primary" id="ov-next">▶ Manche suivante</button>
+      <button class="btn btn-net" id="ov-ask">🙋 Demander une revanche</button>
+      <button class="btn" id="ov-close">👁 Voir la grille</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ═══════════ CHARGEMENT DE PEERJS (avec CDN de secours) ═══════════ */
+  const CDNS = [
+    "https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js",
+    "https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"
+  ];
+  function ensurePeer() {
+    if (window.Peer) return Promise.resolve(true);
+    return CDNS.reduce((chain, url) => chain.then((ok) => ok ? true : new Promise((res) => {
+      const s = document.createElement("script");
+      s.src = url;
+      s.onload = () => res(!!window.Peer);
+      s.onerror = () => res(false);
+      document.head.appendChild(s);
+    })), Promise.resolve(false));
+  }
+
+  /* ═══════════ CONSTANTES ═══════════ */
+  const SYMBOLS = {
+    classic: ["✕", "◯"], hearts: ["❤️", "💙"], animals: ["🐶", "🐱"],
+    food: ["🍎", "🍌"], shapes: ["🔷", "🔶"]
+  };
+  const PREFIX = "morpion-p2p-";           // préfixe des identifiants PeerJS
+  const ALPHA  = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sans I,O,0,1 (ambigus)
+
+  /* ═══════════ ÉTAT DU JEU ═══════════ */
+  const S = {
+    n: 3, k: 3, board: [], current: 1, starter: 1, moves: 0,
+    history: [], scores: [0, 0], draws: 0, rounds: 0,
+    names: ["Joueur 1", "Joueur 2"], symbolKey: "classic", symbols: ["✕", "◯"],
+    running: false, over: false, winLine: [], elapsed: 0, t0: 0
+  };
+
+  /* ═══════════ ÉTAT RÉSEAU ═══════════ */
+  const NET = {
+    mode: "local",        // 'local' | 'host' | 'guest'
+    peer: null, conn: null, code: null,
+    connected: false, myRole: 1, ping: null, pingTimer: null
+  };
+
+  let timerId = null;
+  const $ = (id) => document.getElementById(id);
+  const elBoard = $("board"), elPh = $("placeholder"), elArea = $("grid-area");
+
+  /* ═══════════ UTILITAIRES ═══════════ */
+  const pad2 = (x) => String(x).padStart(2, "0");
+  const fmtTime = (ms) => { const s = Math.floor(ms / 1000); return pad2(Math.floor(s / 60)) + ":" + pad2(s % 60); };
+  const colName = (c) => String.fromCharCode(65 + c);
+  function makeCode() { let s = ""; for (let i = 0; i < 5; i++) s += ALPHA[Math.floor(Math.random() * ALPHA.length)]; return s; }
+
+  function msg(text, info) {
+    const el = $("val-msg");
+    if (!text) { el.classList.remove("visible"); return; }
+    el.textContent = (info ? "ℹ " : "⚠ ") + text;
+    el.classList.toggle("info", !!info);
+    el.classList.add("visible");
+    clearTimeout(msg._t);
+    msg._t = setTimeout(() => el.classList.remove("visible"), 5000);
+  }
+
+  /* ═══════════ CHRONOMÈTRE ═══════════ */
+  function startTimer() {
+    stopTimer();
+    S.t0 = Date.now() - S.elapsed;
+    timerId = setInterval(() => { S.elapsed = Date.now() - S.t0; $("st-time").textContent = fmtTime(S.elapsed); }, 250);
+  }
+  function stopTimer() { if (timerId) { clearInterval(timerId); timerId = null; } }
+
+  /* ═══════════ GRILLE ═══════════ */
+  function buildBoard() {
+    elBoard.innerHTML = "";
+    for (let r = 0; r < S.n; r++) {
+      const row = document.createElement("div");
+      row.className = "board-row";
+      for (let c = 0; c < S.n; c++) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        cell.dataset.r = r; cell.dataset.c = c;
+        cell.title = colName(c) + (r + 1);
+        cell.addEventListener("contextmenu", (e) => e.preventDefault());
+        cell.addEventListener("click", () => tryPlay(r, c));
+        cell.addEventListener("mouseenter", () => {
+          if (!canPlayNow() || S.board[r][c] !== 0) return;
+          cell.classList.add("p" + S.current);
+          cell.innerHTML = '<span class="ghost">' + S.symbols[S.current - 1] + "</span>";
+        });
+        cell.addEventListener("mouseleave", () => {
+          if (S.board[r] && S.board[r][c] === 0) { cell.innerHTML = ""; cell.classList.remove("p1", "p2"); }
+        });
+        row.appendChild(cell);
+      }
+      elBoard.appendChild(row);
+    }
+    elPh.style.display = "none";
+    elBoard.style.display = "flex";
+    sizeBoard();
+  }
+
+  function sizeBoard() {
+    if (!S.n || elBoard.style.display === "none") return;
+    const gap = 6, pad = 32;
+    const w = elArea.clientWidth - pad, h = elArea.clientHeight - pad;
+    const size = Math.max(28, Math.min(
+      Math.floor((w - gap * (S.n - 1)) / S.n),
+      Math.floor((h - gap * (S.n - 1)) / S.n), 140));
+    elBoard.querySelectorAll(".cell").forEach((c) => {
+      c.style.width = size + "px"; c.style.height = size + "px";
+      c.style.fontSize = Math.floor(size * 0.62) + "px";
+    });
+  }
+  window.addEventListener("resize", sizeBoard);
+
+  /* ═══════════ RÈGLES ═══════════ */
+  function canPlayNow() {
+    if (!S.running || S.over) return false;
+    if (NET.mode === "local") return true;
+    if (!NET.connected) return false;
+    return S.current === NET.myRole;
+  }
+
+  function winningLine(r, c, p) {
+    const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+    for (const [dr, dc] of dirs) {
+      const cells = [[r, c]];
+      for (const sign of [1, -1]) {
+        let i = r + dr * sign, j = c + dc * sign;
+        while (i >= 0 && i < S.n && j >= 0 && j < S.n && S.board[i][j] === p) {
+          if (sign === 1) cells.push([i, j]); else cells.unshift([i, j]);
+          i += dr * sign; j += dc * sign;
+        }
+      }
+      if (cells.length >= S.k) return cells;
+    }
+    return null;
+  }
+
+  /* Un coup n'est réellement appliqué que côté « autorité » :
+     l'hôte en ligne, ou le poste lui-même en mode local. */
+  function applyMove(r, c, player) {
+    if (!S.running || S.over) return false;
+    if (S.board[r][c] !== 0 || S.current !== player) return false;
+    S.board[r][c] = player;
+    S.moves++;
+    S.history.push({ p: player, r: r, c: c });
+    const line = winningLine(r, c, player);
+    if (line) { S.winLine = line; endRound(player); return true; }
+    if (S.moves === S.n * S.n) { endRound(0); return true; }
+    S.current = player === 1 ? 2 : 1;
+    renderAll();
+    return true;
+  }
+
+  function tryPlay(r, c) {
+    if (!S.running) { msg("Aucune manche en cours. Lancez une manche."); return; }
+    if (S.over) return;
+    if (S.board[r][c] !== 0) return;
+    if (NET.mode === "guest") {
+      if (!NET.connected) { msg("Connexion perdue avec l'hôte."); return; }
+      if (S.current !== 2) { msg("Ce n'est pas votre tour."); return; }
+      send({ t: "move", r: r, c: c });
+      return;
+    }
+    if (NET.mode === "host") {
+      if (!NET.connected) { msg("En attente de la connexion de l'adversaire."); return; }
+      if (S.current !== 1) { msg("Ce n'est pas votre tour."); return; }
+      if (applyMove(r, c, 1)) broadcast();
+      return;
+    }
+    applyMove(r, c, S.current);   // local
+  }
+
+  function endRound(winner) {
+    S.over = true; S.rounds++;
+    stopTimer();
+    if (winner === 0) S.draws++; else S.scores[winner - 1]++;
+    renderAll();
+    if (NET.mode === "host") broadcast();
+    setTimeout(() => showOverlay(winner), 400);
+  }
+
+  /* ═══════════ MANCHES ═══════════ */
+  function readConfig() {
+    const n = parseInt($("sel-size").value, 10);
+    let k = parseInt($("sel-align").value, 10);
+    if (k > n) { k = n; $("sel-align").value = n; msg("Alignement ramené à " + n + " (taille de la grille).", true); }
+    S.n = n; S.k = k;
+    S.symbolKey = $("sel-symbols").value;
+    S.symbols = SYMBOLS[S.symbolKey].slice();
+    const me = ($("inp-me").value || "Joueur").trim().slice(0, 14);
+    if (NET.mode === "guest") S.names[1] = me; else S.names[0] = me;
+  }
+
+  function newRound(keepScores, switchStarter) {
+    if (!keepScores) { S.scores = [0, 0]; S.draws = 0; S.rounds = 0; S.starter = 1; }
+    else if (switchStarter) { S.starter = S.starter === 1 ? 2 : 1; }
+    S.board = Array.from({ length: S.n }, () => new Array(S.n).fill(0));
+    S.current = S.starter; S.moves = 0; S.history = []; S.winLine = [];
+    S.over = false; S.running = true; S.elapsed = 0;
+    $("overlay").classList.remove("show");
+    buildBoard(); renderAll(); startTimer();
+    if (NET.mode === "host") broadcast();
+  }
+
+  function startPressed() {
+    if (NET.mode === "guest") { msg("Seul l'hôte peut lancer une manche."); return; }
+    if (NET.mode === "host" && !NET.connected) { msg("Attendez la connexion de votre adversaire."); return; }
+    readConfig();
+    newRound(false, false);
+  }
+
+  function quit() {
+    stopTimer();
+    Object.assign(S, {
+      running: false, over: false, board: [], history: [], winLine: [],
+      moves: 0, elapsed: 0, scores: [0, 0], draws: 0, rounds: 0, starter: 1, current: 1
+    });
+    elBoard.innerHTML = ""; elBoard.style.display = "none"; elPh.style.display = "block";
+    $("overlay").classList.remove("show");
+    if (NET.mode === "host") broadcast();
+    renderAll();
+  }
+
+  /* ═══════════ RENDU ═══════════ */
+  function renderCells() {
+    if (elBoard.style.display === "none") return;
+    const playable = canPlayNow();
+    elBoard.querySelectorAll(".cell").forEach((cell) => {
+      const r = +cell.dataset.r, c = +cell.dataset.c;
+      if (!S.board[r]) return;
+      const v = S.board[r][c];
+      cell.className = "cell";
+      cell.innerHTML = "";
+      if (v !== 0) { cell.classList.add("p" + v); cell.innerHTML = '<span class="mark">' + S.symbols[v - 1] + "</span>"; }
+      else if (playable) cell.classList.add("playable");
+    });
+    const last = S.history[S.history.length - 1];
+    if (last && !S.over) {
+      const el = elBoard.querySelector('.cell[data-r="' + last.r + '"][data-c="' + last.c + '"]');
+      if (el) el.classList.add("last");
+    }
+    S.winLine.forEach(([r, c]) => {
+      const el = elBoard.querySelector('.cell[data-r="' + r + '"][data-c="' + c + '"]');
+      if (el) el.classList.add("win");
+    });
+  }
+
+  function renderStats() {
+    $("st-time").textContent = fmtTime(S.elapsed);
+    $("st-moves").textContent = S.moves;
+    $("st-score").textContent = S.scores[0] + " — " + S.scores[1];
+    $("st-goal").textContent = S.k + " alignés";
+    if (S.running && !S.over) {
+      const mine = NET.mode !== "local" && S.current === NET.myRole;
+      $("st-turn").textContent = S.symbols[S.current - 1] + " " + (mine ? "VOUS" : S.names[S.current - 1]);
+    } else $("st-turn").textContent = "—";
+
+    $("pc-name-1").textContent = S.names[0] + (NET.mode !== "local" && NET.myRole === 1 ? " (vous)" : "");
+    $("pc-name-2").textContent = S.names[1] + (NET.mode !== "local" && NET.myRole === 2 ? " (vous)" : "");
+    $("pc-mark-1").textContent = S.symbols[0];
+    $("pc-mark-2").textContent = S.symbols[1];
+    $("pc-score-1").textContent = S.scores[0];
+    $("pc-score-2").textContent = S.scores[1];
+    $("pc-sub-1").textContent = NET.mode === "local" ? "Local" : "Hôte";
+    $("pc-sub-2").textContent = NET.mode === "local" ? "Local" : (NET.connected ? "Invité — connecté" : "Invité — hors ligne");
+    $("sc-draws").textContent = S.draws;
+    $("sc-rounds").textContent = S.rounds;
+    $("pc-1").classList.toggle("active", S.running && !S.over && S.current === 1);
+    $("pc-2").classList.toggle("active", S.running && !S.over && S.current === 2);
+
+    const isGuest = NET.mode === "guest";
+    ["sel-size", "sel-align", "sel-symbols"].forEach((id) => { $(id).disabled = isGuest; });
+    $("btn-start").disabled = isGuest || (NET.mode === "host" && !NET.connected);
+    $("chat-input").disabled = NET.mode === "local";
+    $("chat-send").disabled = NET.mode === "local";
+  }
+
+  function renderHistory() {
+    const box = $("history-list"); box.innerHTML = "";
+    S.history.slice(-30).reverse().forEach((m, i) => {
+      const idx = S.history.length - i;
+      const d = document.createElement("div");
+      d.className = "hist-item";
+      d.innerHTML = '<span class="hi-num">' + idx + '.</span><span>' + S.symbols[m.p - 1] + "</span><span>" +
+                    S.names[m.p - 1] + '</span><span class="hi-pos">' + colName(m.c) + (m.r + 1) + "</span>";
+      box.appendChild(d);
+    });
+  }
+
+  function renderNet() {
+    const dot = $("net-dot"), txt = $("net-text");
+    dot.className = "dot";
+    $("net-code-wrap").style.display = NET.mode === "local" ? "none" : "inline";
+    $("btn-copy-link").style.display = NET.mode === "host" ? "inline-flex" : "none";
+    $("net-code").textContent = NET.code || "-----";
+    if (NET.mode === "local") { txt.textContent = "Mode local — les deux joueurs jouent sur cet écran"; }
+    else if (NET.connected) {
+      dot.classList.add("on");
+      txt.textContent = (NET.mode === "host" ? "Hôte" : "Invité") + " — connecté à " + S.names[NET.myRole === 1 ? 1 : 0] +
+                        " · vous jouez " + S.symbols[NET.myRole - 1];
+    } else {
+      dot.classList.add(NET.mode === "host" ? "wait" : "off");
+      txt.textContent = NET.mode === "host" ? "En attente de connexion de l'adversaire…" : "Déconnecté de l'hôte";
+    }
+    $("net-ping").textContent = NET.connected && NET.ping != null ? "latence " + NET.ping + " ms" : "";
+  }
+
+  function renderAll() { renderCells(); renderStats(); renderHistory(); renderNet(); }
+
+  /* ═══════════ OVERLAY FIN DE MANCHE ═══════════ */
+  function showOverlay(winner) {
+    const t = $("ov-title");
+    if (winner === 0) { t.textContent = "🤝 Match nul !"; t.classList.add("draw"); }
+    else {
+      const mine = NET.mode !== "local" && winner === NET.myRole;
+      t.textContent = mine ? "🎉 Vous gagnez la manche !"
+                           : "🏆 " + S.symbols[winner - 1] + " " + S.names[winner - 1] + " gagne la manche !";
+      t.classList.remove("draw");
+    }
+    $("ov-time").textContent = fmtTime(S.elapsed);
+    $("ov-moves").textContent = S.moves;
+    $("ov-score").textContent = S.scores[0] + " — " + S.scores[1];
+    const guest = NET.mode === "guest";
+    $("ov-next").style.display = guest ? "none" : "inline-flex";
+    $("ov-ask").style.display  = guest ? "inline-flex" : "none";
+    $("ov-wait").style.display = guest ? "block" : "none";
+    $("overlay").classList.add("show");
+  }
+
+  /* ═══════════ CHAT ═══════════ */
+  function addChat(who, text, sys) {
+    const box = $("chat-box");
+    const d = document.createElement("div");
+    d.className = "chat-msg" + (sys ? " sys" : "") + (who === "moi" ? " mine" : "");
+    d.innerHTML = sys ? text : "<b>" + escapeHtml(who) + " :</b> " + escapeHtml(text);
+    box.appendChild(d);
+    box.scrollTop = box.scrollHeight;
+    while (box.children.length > 60) box.removeChild(box.firstChild);
+  }
+  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
+
+  function sendChat(text) {
+    text = (text || "").trim();
+    if (!text) return;
+    if (NET.mode === "local" || !NET.connected) { msg("La discussion nécessite une partie en ligne connectée."); return; }
+    send({ t: "chat", text: text });
+    addChat("moi", text);
+  }
+
+  /* ═══════════ RÉSEAU : ENVOI ═══════════ */
+  function send(obj) { try { if (NET.conn && NET.conn.open) NET.conn.send(obj); } catch (e) { /* ignore */ } }
+
+  function snapshot() {
+    return {
+      n: S.n, k: S.k, board: S.board, current: S.current, starter: S.starter, moves: S.moves,
+      history: S.history, scores: S.scores, draws: S.draws, rounds: S.rounds,
+      names: S.names, symbolKey: S.symbolKey, running: S.running, over: S.over,
+      winLine: S.winLine, elapsed: S.elapsed
+    };
+  }
+  function broadcast() { send({ t: "state", s: snapshot() }); }
+
+  function applySnapshot(d) {
+    const wasOver = S.over, hadBoard = S.n === d.n && elBoard.style.display !== "none";
+    Object.assign(S, {
+      n: d.n, k: d.k, board: d.board, current: d.current, starter: d.starter, moves: d.moves,
+      history: d.history || [], scores: d.scores, draws: d.draws, rounds: d.rounds,
+      names: d.names, symbolKey: d.symbolKey, symbols: (SYMBOLS[d.symbolKey] || SYMBOLS.classic).slice(),
+      running: d.running, over: d.over, winLine: d.winLine || [], elapsed: d.elapsed || 0
+    });
+    $("sel-size").value = S.n; $("sel-align").value = S.k; $("sel-symbols").value = S.symbolKey;
+    if (!S.running) {
+      stopTimer(); elBoard.innerHTML = ""; elBoard.style.display = "none"; elPh.style.display = "block";
+      $("overlay").classList.remove("show");
+    } else {
+      if (!hadBoard || elBoard.querySelectorAll(".cell").length !== S.n * S.n) buildBoard();
+      if (S.over) { stopTimer(); if (!wasOver) setTimeout(() => showOverlay(winnerFromState()), 400); }
+      else { $("overlay").classList.remove("show"); startTimer(); }
+    }
+    renderAll();
+  }
+  function winnerFromState() {
+    if (!S.winLine.length) return 0;
+    const [r, c] = S.winLine[0];
+    return S.board[r][c];
+  }
+
+  /* ═══════════ RÉSEAU : GESTION DES MESSAGES ═══════════ */
+  function handleData(d) {
+    if (!d || typeof d !== "object") return;
+    switch (d.t) {
+      case "join":                                  // hôte : l'invité se présente
+        S.names[1] = (d.name || "Joueur 2").slice(0, 14);
+        NET.connected = true;
+        addChat("", "🔌 <b>" + escapeHtml(S.names[1]) + "</b> a rejoint la partie.", true);
+        send({ t: "welcome", names: S.names, myRole: 2 });
+        broadcast(); renderAll();
+        msg(S.names[1] + " a rejoint la partie. Lancez la manche !", true);
+        break;
+      case "welcome":                               // invité : accueil de l'hôte
+        S.names = d.names; NET.myRole = 2; NET.connected = true;
+        addChat("", "🔌 Connecté à <b>" + escapeHtml(S.names[0]) + "</b>.", true);
+        renderAll();
+        break;
+      case "state":
+        if (NET.mode === "guest") applySnapshot(d.s);
+        break;
+      case "move":                                  // hôte : coup demandé par l'invité
+        if (NET.mode === "host" && applyMove(d.r, d.c, 2)) broadcast();
+        break;
+      case "chat":
+        addChat(S.names[NET.myRole === 1 ? 1 : 0], d.text);
+        break;
+      case "rematch":
+        msg(S.names[1] + " demande une nouvelle manche.", true);
+        addChat("", "🔁 <b>" + escapeHtml(S.names[1]) + "</b> demande une revanche.", true);
+        break;
+      case "ping": send({ t: "pong", ts: d.ts }); break;
+      case "pong": NET.ping = Date.now() - d.ts; renderNet(); break;
+      case "bye":
+        NET.connected = false;
+        addChat("", "👋 L'adversaire a quitté la partie.", true);
+        renderAll();
+        break;
+    }
+  }
+
+  function wireConn(conn) {
+    NET.conn = conn;
+    conn.on("data", handleData);
+    conn.on("close", () => {
+      NET.connected = false; NET.ping = null;
+      addChat("", "⚠️ Connexion interrompue.", true);
+      msg("Connexion avec l'adversaire interrompue.");
+      renderAll();
+    });
+    conn.on("error", () => { msg("Erreur de connexion P2P."); });
+    if (NET.pingTimer) clearInterval(NET.pingTimer);
+    NET.pingTimer = setInterval(() => { if (NET.connected) send({ t: "ping", ts: Date.now() }); }, 4000);
+  }
+
+  /* ═══════════ RÉSEAU : HÔTE ═══════════ */
+  function hostGame() {
+    ensurePeer().then((ok) => {
+      if (!ok) { $("host-status").textContent = "❌ Impossible de charger PeerJS (vérifiez votre connexion Internet)."; return; }
+      cleanupPeer();
+      NET.mode = "host"; NET.myRole = 1; NET.connected = false;
+      NET.code = makeCode();
+      S.names[0] = ($("inp-nick").value || "Joueur 1").trim().slice(0, 14) || "Joueur 1";
+      S.names[1] = "Joueur 2";
+      $("inp-me").value = S.names[0];
+
+      $("net-step-choice").style.display = "none";
+      $("net-step-host").style.display = "block";
+      $("host-code").textContent = NET.code;
+      $("host-link").value = shareLink(NET.code);
+      $("host-status").textContent = "⏳ Création de la salle…";
+
+      NET.peer = new Peer(PREFIX + NET.code.toLowerCase(), { debug: 1 });
+      NET.peer.on("open", () => {
+        $("host-status").textContent = "⏳ En attente de connexion de l'adversaire…";
+        renderAll();
+      });
+      NET.peer.on("connection", (conn) => {
+        if (NET.conn && NET.conn.open) { conn.close(); return; }   // 1 seul adversaire
+        wireConn(conn);
+        conn.on("open", () => {
+          $("host-status").textContent = "✅ Adversaire connecté !";
+          setTimeout(() => $("net-modal").classList.remove("show"), 900);
+        });
+      });
+      NET.peer.on("error", (err) => {
+        if (err && err.type === "unavailable-id") {                 // code déjà pris : on retente
+          $("host-status").textContent = "Code déjà utilisé, nouveau code en cours…";
+          setTimeout(hostGame, 300);
+        } else {
+          $("host-status").textContent = "❌ Erreur réseau : " + (err && err.type ? err.type : "inconnue");
+        }
+      });
+      renderAll();
+    });
+  }
+
+  /* ═══════════ RÉSEAU : INVITÉ ═══════════ */
+  function joinGame(code) {
+    code = (code || "").trim().toUpperCase();
+    if (code.length !== 5) { showJoinStatus("❌ Le code doit comporter 5 caractères."); return; }
+    ensurePeer().then((ok) => {
+      if (!ok) { showJoinStatus("❌ Impossible de charger PeerJS (vérifiez votre connexion Internet)."); return; }
+      cleanupPeer();
+      NET.mode = "guest"; NET.myRole = 2; NET.connected = false; NET.code = code;
+      S.names[1] = ($("inp-nick").value || "Joueur 2").trim().slice(0, 14) || "Joueur 2";
+      $("inp-me").value = S.names[1];
+      showJoinStatus("⏳ Connexion à la salle " + code + "…");
+
+      NET.peer = new Peer({ debug: 1 });
+      NET.peer.on("open", () => {
+        const conn = NET.peer.connect(PREFIX + code.toLowerCase(), { reliable: true });
+        wireConn(conn);
+        conn.on("open", () => {
+          send({ t: "join", name: S.names[1] });
+          showJoinStatus("✅ Connecté ! La partie est pilotée par l'hôte.");
+          setTimeout(() => $("net-modal").classList.remove("show"), 900);
+          renderAll();
+        });
+        conn.on("error", () => showJoinStatus("❌ Connexion impossible. Vérifiez le code."));
+        setTimeout(() => { if (!NET.connected) showJoinStatus("❌ Aucune réponse : code invalide ou hôte hors ligne."); }, 12000);
+      });
+      NET.peer.on("error", (err) => {
+        const type = err && err.type ? err.type : "inconnue";
+        showJoinStatus(type === "peer-unavailable" ? "❌ Salle introuvable : vérifiez le code." : "❌ Erreur réseau : " + type);
+      });
+      renderAll();
+    });
+  }
+  function showJoinStatus(t) { const el = $("join-status"); el.style.display = "block"; el.textContent = t; }
+
+  function goLocal() {
+    cleanupPeer();
+    NET.mode = "local"; NET.myRole = 1; NET.connected = false; NET.code = null; NET.ping = null;
+    S.names = [($("inp-nick").value || "Joueur 1").trim().slice(0, 14) || "Joueur 1", "Joueur 2"];
+    $("inp-me").value = S.names[0];
+    $("net-modal").classList.remove("show");
+    renderAll();
+  }
+
+  function cleanupPeer() {
+    if (NET.pingTimer) { clearInterval(NET.pingTimer); NET.pingTimer = null; }
+    try { if (NET.conn && NET.conn.open) { send({ t: "bye" }); NET.conn.close(); } } catch (e) {}
+    try { if (NET.peer) NET.peer.destroy(); } catch (e) {}
+    NET.conn = null; NET.peer = null; NET.connected = false; NET.ping = null;
+  }
+  window.addEventListener("beforeunload", cleanupPeer);
+
+  function shareLink(code) {
+    return location.origin + location.pathname + "?room=" + code;
+  }
+  function copy(text, okMsg) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => msg(okMsg, true), () => msg("Copie impossible : sélectionnez le texte manuellement."));
+    } else msg("Copie impossible : sélectionnez le texte manuellement.");
+  }
+
+  /* ═══════════ ÉVÉNEMENTS ═══════════ */
+  $("btn-start").addEventListener("click", startPressed);
+  $("btn-quit").addEventListener("click", quit);
+  $("btn-connect").addEventListener("click", () => {
+    $("net-step-choice").style.display = "block";
+    $("net-step-host").style.display = "none";
+    $("net-step-join").style.display = "none";
+    $("join-status").style.display = "none";
+    $("net-modal").classList.add("show");
+  });
+  $("net-modal-close").addEventListener("click", () => $("net-modal").classList.remove("show"));
+  $("ch-host").addEventListener("click", hostGame);
+  $("ch-join").addEventListener("click", () => {
+    $("net-step-choice").style.display = "none";
+    $("net-step-join").style.display = "block";
+    $("join-code").focus();
+  });
+  $("ch-local").addEventListener("click", goLocal);
+  $("host-back").addEventListener("click", () => { cleanupPeer(); NET.mode = "local"; NET.code = null; $("net-step-host").style.display = "none"; $("net-step-choice").style.display = "block"; renderAll(); });
+  $("join-back").addEventListener("click", () => { cleanupPeer(); NET.mode = "local"; NET.code = null; $("net-step-join").style.display = "none"; $("net-step-choice").style.display = "block"; renderAll(); });
+  $("btn-do-join").addEventListener("click", () => joinGame($("join-code").value));
+  $("join-code").addEventListener("keydown", (e) => { if (e.key === "Enter") joinGame($("join-code").value); });
+  $("join-code").addEventListener("input", (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); });
+  $("btn-copy-link").addEventListener("click", () => copy(shareLink(NET.code), "Lien d'invitation copié."));
+  $("btn-copy-link2").addEventListener("click", () => copy($("host-link").value, "Lien d'invitation copié."));
+
+  $("btn-aide-toggle").addEventListener("click", () => $("aide-modal").classList.add("show"));
+  $("btn-aide-close").addEventListener("click", () => $("aide-modal").classList.remove("show"));
+  $("btn-aide-ok").addEventListener("click", () => $("aide-modal").classList.remove("show"));
+
+  $("ov-next").addEventListener("click", () => { if (NET.mode !== "guest") newRound(true, true); });
+  $("ov-ask").addEventListener("click", () => { send({ t: "rematch" }); msg("Demande de revanche envoyée à l'hôte.", true); });
+  $("ov-close").addEventListener("click", () => $("overlay").classList.remove("show"));
+
+  $("chat-send").addEventListener("click", () => { sendChat($("chat-input").value); $("chat-input").value = ""; });
+  $("chat-input").addEventListener("keydown", (e) => { if (e.key === "Enter") { sendChat($("chat-input").value); $("chat-input").value = ""; } });
+  document.querySelectorAll("#chat-quick button").forEach((b) => b.addEventListener("click", () => sendChat(b.dataset.msg)));
+
+  $("sel-size").addEventListener("change", () => {
+    const n = parseInt($("sel-size").value, 10), sel = $("sel-align");
+    Array.from(sel.options).forEach((o) => { o.disabled = parseInt(o.value, 10) > n; });
+    if (parseInt(sel.value, 10) > n) sel.value = n;
+  });
+  $("inp-me").addEventListener("input", () => {
+    const v = ($("inp-me").value || "Joueur").slice(0, 14);
+    if (NET.mode === "guest") S.names[1] = v; else S.names[0] = v;
+    $("inp-nick").value = v;
+    if (NET.mode === "host" && NET.connected) broadcast();
+    if (NET.mode === "guest" && NET.connected) send({ t: "chat", text: "(je me renomme « " + v + " »)" });
+    renderAll();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") document.querySelectorAll(".modal.show").forEach((m) => m.classList.remove("show"));
+  });
+
+  /* ═══════════ INITIALISATION ═══════════ */
+  $("sel-size").dispatchEvent(new Event("change"));
+  renderAll();
+
+  const room = new URLSearchParams(location.search).get("room");
+  if (room) {
+    $("net-modal").classList.add("show");
+    $("net-step-choice").style.display = "none";
+    $("net-step-join").style.display = "block";
+    $("join-code").value = room.toUpperCase().slice(0, 5);
+    $("inp-nick").value = "Joueur 2";
+    showJoinStatus("Invitation détectée : saisissez votre pseudo puis cliquez sur « Se connecter ».");
+  } else {
+    $("net-modal").classList.add("show");
+  }
+})();
+</script>
+</body>
+</html>
