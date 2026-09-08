@@ -241,16 +241,13 @@
     <div class="cfg-group">
       <span class="cfg-label">Grille</span>
       <select id="sel-size" class="dim-select">
-        <option value="3" selected>3 × 3</option><option value="4">4 × 4</option>
-        <option value="5">5 × 5</option><option value="6">6 × 6</option>
-        <option value="7">7 × 7</option><option value="8">8 × 8</option>
-        <option value="9">9 × 9</option><option value="10">10 × 10</option>
+        <option value="3">3 × 3</option><option value="4" selected>4 × 4</option>
       </select>
     </div>
     <div class="cfg-group">
       <span class="cfg-label">Alignement</span>
       <select id="sel-align" class="dim-select">
-        <option value="3" selected>3</option><option value="4">4</option><option value="5">5</option>
+        <option value="3" selected>3</option><option value="4">4</option>
       </select>
     </div>
     <div class="separator"></div>
@@ -426,7 +423,7 @@
     </div>
     <ol class="help">
       <li><strong>En ligne :</strong> l'un des joueurs choisit <strong>Créer une partie</strong> et envoie le code (5 caractères) ou le lien à l'autre, qui choisit <strong>Rejoindre une partie</strong>. La connexion est directe de navigateur à navigateur.</li>
-      <li>L'<strong>hôte</strong> joue le premier symbole, règle la taille de grille, l'alignement et les symboles, et lance les manches. L'<strong>invité</strong> reçoit automatiquement les réglages.</li>
+      <li>L'<strong>hôte</strong> joue le premier symbole, règle la taille de grille (3×3 ou 4×4), l'alignement et les symboles, et lance les manches. L'<strong>invité</strong> reçoit automatiquement les réglages.</li>
       <li>Chacun ne peut jouer que <strong>pendant son tour</strong> ; la barre de statistiques indique en permanence à qui c'est.</li>
       <li>Le premier à aligner le nombre requis de symboles en <strong>ligne, colonne ou diagonale</strong> gagne la manche ; l'alignement est surligné en vert.</li>
       <li>Grille pleine sans alignement : <strong>match nul</strong>.</li>
@@ -488,7 +485,7 @@
 
   /* ═══════════ ÉTAT DU JEU ═══════════ */
   const S = {
-    n: 3, k: 3, board: [], current: 1, starter: 1, moves: 0,
+    n: 4, k: 3, board: [], current: 1, starter: 1, moves: 0,
     history: [], scores: [0, 0], draws: 0, rounds: 0,
     names: ["Joueur 1", "Joueur 2"], symbolKey: "classic", symbols: ["✕", "◯"],
     running: false, over: false, winLine: [], elapsed: 0, t0: 0
